@@ -31,3 +31,6 @@ Project includes .blend scenes for Vector and Shadow Fight 2, and additionally o
 
 # Documentation
 Docmentation is available on the [Gymnast Tool Suite Documentation Wiki](https://github.com/FlipThoseTitle/Gymnast-Tool-Suite/wiki)
+
+# Statue of Honorable Mention
+This project wouldn't be possible without Vision (@sonamenil), who has helped and contributed along with the project. Thank you for everything, I genuinely mean it in my heart.
