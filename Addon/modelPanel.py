@@ -174,8 +174,8 @@ def store_edge_attack(context, edges, vertices, edges_element, starting_edge, st
     
     for i, edge in enumerate(edges, start=1):
         v1, v2 = edge.vertices
-        node1 = f"{prefix}MacroNode{v1 + starting_node}"
-        node2 = f"{prefix}MacroNode{v2 + starting_node}"
+        node1 = f"{prefix}Node{v1 + starting_node}"
+        node2 = f"{prefix}Node{v2 + starting_node}"
         edge_length = math.dist(vertices[v1].co, vertices[v2].co)
         
         if is_first and is_ranged is None:
