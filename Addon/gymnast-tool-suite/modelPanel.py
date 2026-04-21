@@ -17,6 +17,12 @@ from mathutils import Vector
 # Functions
 # #################### #
 
+def safe_float(val):
+    """Safely convert a string to float, handling regional comma decimals."""
+    if not val or val == "Null": 
+        return 0.0
+    return float(str(val).replace(',', '.'))
+
 def _get_vgroups(obj):
     if obj and obj.type == 'MESH' and obj.vertex_groups:
         return [(vg.name, vg.name, "") for vg in obj.vertex_groups]
@@ -295,7 +301,7 @@ class ConvertXMLOperator(bpy.types.Operator):
                     for node in nodes_section:
                         ntype = node.get('Type')
                         if ntype in ['Node', 'CenterOfMass'] or (ntype == 'MacroNode' and not props.calculate_macronode):
-                            x, y, z = float(node.get('X')), float(node.get('Y')), float(node.get('Z'))
+                            x, y, z = safe_float(node.get('X')), safe_float(node.get('Y')), safe_float(node.get('Z'))
                             nodes[node.tag] = (x, y, z)
                             node_index_map[node.tag] = vertex_counter
                             obj_file.write(f"v {x} {-z} {y}\n")
@@ -312,13 +318,13 @@ class ConvertXMLOperator(bpy.types.Operator):
                                 lcc_val = node.get(f'LCC{i}')
                                 
                                 if not child_name or child_name == "Null" or not lcc_val: continue
-                                lcc = float(lcc_val)
+                                lcc = safe_float(lcc_val)
 
                                 if child_name in nodes:
                                     cx, cy, cz = nodes[child_name]
                                 elif child_name in dep_nodes_dict:
                                     d_node = dep_nodes_dict[child_name]
-                                    cx, cy, cz = float(d_node.get('X')), float(d_node.get('Y')), float(d_node.get('Z'))
+                                    cx, cy, cz = safe_float(d_node.get('X')), safe_float(d_node.get('Y')), safe_float(d_node.get('Z'))
                                 else:
                                     b_obj = bpy.data.objects.get(child_name)
                                     if b_obj:
@@ -346,7 +352,7 @@ class ConvertXMLOperator(bpy.types.Operator):
                                 for n in (n1, n2, n3):
                                     if n not in nodes and n in dep_nodes_dict:
                                         d_node = dep_nodes_dict[n]
-                                        x, y, z = float(d_node.get('X')), float(d_node.get('Y')), float(d_node.get('Z'))
+                                        x, y, z = safe_float(d_node.get('X')), safe_float(d_node.get('Y')), safe_float(d_node.get('Z'))
                                         nodes[n] = (x, y, z)
                                         node_index_map[n] = vertex_counter
                                         obj_file.write(f"v {x} {-z} {y}\n")
@@ -629,7 +635,7 @@ class AddNodesOperator(bpy.types.Operator):
         for node in nodes_section:
             ntype = node.get('Type')
             if ntype in ['Node', 'CenterOfMass'] or (ntype == 'MacroNode' and not props.calculate_macronode):
-                x, y, z = float(node.get('X')), float(node.get('Y')), float(node.get('Z'))
+                x, y, z = safe_float(node.get('X')), safe_float(node.get('Y')), safe_float(node.get('Z'))
                 node_positions[node.tag] = (x, y, z)
                 
         # Pass 2: Calculate MacroNodes via LCCs if enabled
@@ -642,7 +648,7 @@ class AddNodesOperator(bpy.types.Operator):
                         lcc_val = node.get(f'LCC{i}')
                         
                         if child_name and child_name != "Null" and lcc_val:
-                            lcc = float(lcc_val)
+                            lcc = safe_float(lcc_val)
                             
                             if child_name in node_positions:
                                 cx, cy, cz = node_positions[child_name]
@@ -741,7 +747,7 @@ class AddEdgesOperator(bpy.types.Operator):
             node_name = node.tag
 
             if node_type in ['Node', 'CenterOfMass'] or (node_type == 'MacroNode' and not props.calculate_macronode):
-                x, y, z = float(node.get('X')), float(node.get('Y')), float(node.get('Z'))
+                x, y, z = safe_float(node.get('X')), safe_float(node.get('Y')), safe_float(node.get('Z'))
                 nodes[node_name] = (x, y, z)
                 verts.append((x, -z, y))
                 node_name_to_index[node_name] = vertex_counter
@@ -760,13 +766,13 @@ class AddEdgesOperator(bpy.types.Operator):
                     lcc_val = node.get(f'LCC{i}')
                     
                     if child_name and child_name != "Null" and lcc_val:
-                        lcc = float(lcc_val)
+                        lcc = safe_float(lcc_val)
 
                         if child_name in nodes:
                             cx, cy, cz = nodes[child_name]
                         elif child_name in dep_nodes_dict:
                             d_node = dep_nodes_dict[child_name]
-                            cx, cy, cz = float(d_node.get('X')), float(d_node.get('Y')), float(d_node.get('Z'))
+                            cx, cy, cz = safe_float(d_node.get('X')), safe_float(d_node.get('Y')), safe_float(d_node.get('Z'))
                         else:
                             blender_obj = bpy.data.objects.get(child_name)
                             if blender_obj:
@@ -795,7 +801,7 @@ class AddEdgesOperator(bpy.types.Operator):
                 for end in (end1, end2):
                     if end not in node_name_to_index and end in dep_nodes_dict:
                         d_node = dep_nodes_dict[end]
-                        x, y, z = float(d_node.get('X')), float(d_node.get('Y')), float(d_node.get('Z'))
+                        x, y, z = safe_float(d_node.get('X')), safe_float(d_node.get('Y')), safe_float(d_node.get('Z'))
                         verts.append((x, -z, y))
                         node_name_to_index[end] = vertex_counter
                         vertex_counter += 1
@@ -1144,9 +1150,9 @@ class AddCapsulesOperator(bpy.types.Operator):
             end2_obj = bpy.data.objects.get(edge_info["End2"])
             if not end1_obj or not end2_obj: continue
 
-            radius1 = float(capsule.attrib.get("Radius1", 1.0))
-            margin1 = float(capsule.attrib.get("Margin1", 0.0))
-            margin2 = float(capsule.attrib.get("Margin2", 0.0))
+            radius1 = safe_float(capsule.attrib.get("Radius1", 1.0))
+            margin1 = safe_float(capsule.attrib.get("Margin1", 0.0))
+            margin2 = safe_float(capsule.attrib.get("Margin2", 0.0))
 
             # Instantiate the object directly sharing the dummy vertex mesh
             capsule_obj = bpy.data.objects.new(capsule_name, shared_capsule_mesh)
