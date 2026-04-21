@@ -7,7 +7,6 @@ Gymnast Tool Suite is a free Blender add-on for modding Vector and Shadow Fight 
 The add-on comes with three main tools:
 - Animation Tool
 - Model Tool
-- XML Tool
 
 <img width="337" height="602" alt="image" src="https://github.com/user-attachments/assets/9ad59b1d-2cde-4cc0-9108-4e721d9370f7" />
 
