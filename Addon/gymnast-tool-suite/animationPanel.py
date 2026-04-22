@@ -385,21 +385,40 @@ def import_bin(filepath, dependencies_xml="", model_xml=""):
 class ExportBinOperator(bpy.types.Operator):
     bl_idname = "export.bin"
     bl_label = "Export Animation"
-    bl_description = "Export the positions of node points in every frame directly to a .bin file"
+    bl_description = "Export the positions of node points in every frame directly to a file"
     
     bl_options = {'REGISTER', 'UNDO'}
     
     filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    
+    filter_glob: bpy.props.StringProperty(
+        default="*.bin;*.bytes",
+        options={'HIDDEN'},
+        maxlen=255,
+    )
+
+    # include dropdown to the export window sidebar
+    export_format: bpy.props.EnumProperty(
+        name="Format",
+        description="Choose the export file format",
+        items=[
+            ('.bin', ".bin", "Export as a .bin file"),
+            ('.bytes', ".bytes", "Export as a .bytes file")
+        ],
+        default='.bin'
+    )
 
     def execute(self, context):
         settings = context.scene.gymnast_tool_props
         deps_xml = bpy.path.abspath(settings.dependencies_xml) if settings.dependencies_xml else None
         mod_xml = bpy.path.abspath(settings.model_xml) if settings.model_xml else None
     
-        if not self.filepath.endswith(".bin"): self.filepath += ".bin"
+        # force an extension based on the dropdown.
+        base_path, _ = os.path.splitext(self.filepath)
+        final_filepath = base_path + self.export_format
         
         try:
-            export_bin(self.filepath, deps_xml, mod_xml)
+            export_bin(final_filepath, deps_xml, mod_xml)
         except ValueError as e:
             self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
@@ -408,7 +427,7 @@ class ExportBinOperator(bpy.types.Operator):
 
     def invoke(self, context, event):
         scene_name = os.path.splitext(bpy.path.basename(context.blend_data.filepath))[0]
-        self.filepath = bpy.path.abspath("//") + scene_name + ".bin"
+        self.filepath = bpy.path.abspath("//") + scene_name
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
     
