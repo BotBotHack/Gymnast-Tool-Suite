@@ -298,11 +298,7 @@ def import_bin(filepath, dependencies_xml="", model_xml=""):
     new_start_frame = scene.frame_start
 
     if settings.use_spline and pivot_node_obj:
-        if pivot_node_obj.animation_data and pivot_node_obj.animation_data.action:
-            keyframes = [kp.co.x for curve in pivot_node_obj.animation_data.action.fcurves if curve.data_path == "location" for kp in curve.keyframe_points]
-            new_start_frame = int(max(keyframes, default=scene.frame_start)) + 1
-        else:
-            new_start_frame = scene.frame_start + 1
+        new_start_frame = scene.frame_current
             
         if not settings.stay_in_place: last_pivot_pos = pivot_node_obj.matrix_world.translation.copy()
     
