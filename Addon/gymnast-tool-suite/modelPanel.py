@@ -177,12 +177,15 @@ def write_clothnode(element, name, pos, mass, attenuation):
         Visible="1", Collisible="0", Passive="0", Cloth="1", Attenuation=f"{attenuation:.2f}", Rank="0"
     )
 
-def process_object_nodes(obj, vertices, nodes_element, start_node, prefix, settings, cloth_indices, p_nodes, child_names):
+def process_object_nodes(obj, vertices, nodes_element, start_node, prefix, settings, cloth_indices, p_nodes, child_names, macro_indices=None, custom_p_nodes=None, custom_child_names=None):
+    if macro_indices is None: macro_indices = set()
     for i, vertex in enumerate(vertices, start=start_node):
         node_name = f"{prefix}Node{i}"
         pos = obj.matrix_world @ vertex.co
         if vertex.index in cloth_indices:
             write_clothnode(nodes_element, node_name, pos, settings.model_export_cloth_mass, settings.model_export_cloth_attenuation)
+        elif vertex.index in macro_indices and custom_p_nodes and custom_child_names:
+            write_macronode(nodes_element, node_name, pos, settings.model_node_mass, settings.model_node_fixed, custom_p_nodes, custom_child_names)
         else:
             write_macronode(nodes_element, node_name, pos, settings.model_node_mass, settings.model_node_fixed, p_nodes, child_names)
     return start_node + len(vertices)
@@ -468,15 +471,34 @@ class ExportModelToXML(bpy.types.Operator):
             mesh, verts, edges, faces = get_triangulated_data(o)
             cloth_idx = get_cloth_indices(o, cloth_grp_name) if settings.model_export_cloth else set()
             
+            # Custom ChildNodes Override
+            macro_idx = set()
+            custom_p_nodes = ()
+            custom_child_names = []
+            if settings.model_custom_childnode:
+                custom_objs = [settings.childnode_1_object, settings.childnode_2_object, settings.childnode_3_object, settings.childnode_4_object]
+                if all(custom_objs):
+                    custom_child_names = [obj.name for obj in custom_objs]
+                    custom_p_nodes = tuple(obj.matrix_world.translation for obj in custom_objs)
+                    
+                    if expected_type == "WEAPON":
+                        if o == settings.weapon_object_1:
+                            macro_idx = get_cloth_indices(o, settings.macronode_vertex_group_weapon_1)
+                        elif o == settings.weapon_object_2:
+                            macro_idx = get_cloth_indices(o, settings.macronode_vertex_group_weapon_2)
+                    else:
+                        macro_idx = get_cloth_indices(o, settings.macronode_vertex_group)
+                else:
+                    self.report({'WARNING'}, "Custom ChildNodes enabled but missing object references. Defaulting to standard behavior.")
+            
             p_dict = get_child_nodes_dict(child_reqs, self.report) if child_reqs else {}
             if p_dict is None and child_reqs: return False
             p_nodes = tuple(p_dict[n] for n in child_reqs) if p_dict else ()
 
             if is_attack:
                 store_edge_attack(context, edges, verts, edges_elem, start_edge, start_node, is_first=True, is_ranged=is_ranged)
-                start_node = process_object_nodes(o, verts, nodes_elem, start_node, prefix, settings, set(), p_nodes, child_reqs)
+                start_node = process_object_nodes(o, verts, nodes_elem, start_node, prefix, settings, set(), p_nodes, child_reqs, macro_idx, custom_p_nodes, custom_child_names)
             elif expected_type == "BODY_GEAR":
-                # Body gear handling mapping points based on Z height
                 p_up = tuple(get_child_nodes_dict(["NChestS_1", "NChestF", "NChestS_2", "NNeck"], self.report).values())
                 p_mid = tuple(get_child_nodes_dict(["NStomachS_1", "NStomachF", "NStomachS_2", "NChest"], self.report).values())
                 p_low = tuple(get_child_nodes_dict(["NPelvisF", "NHip_1", "NHip_2", "NStomach"], self.report).values())
@@ -493,6 +515,8 @@ class ExportModelToXML(bpy.types.Operator):
                     pos = o.matrix_world @ v.co
                     if v.index in cloth_idx:
                         write_clothnode(nodes_elem, f"{prefix}Node{i}", pos, settings.model_export_cloth_mass, settings.model_export_cloth_attenuation)
+                    elif v.index in macro_idx and custom_p_nodes and custom_child_names:
+                        write_macronode(nodes_elem, f"{prefix}Node{i}", pos, settings.model_node_mass, settings.model_node_fixed, custom_p_nodes, custom_child_names)
                     else:
                         p_n, c_names = get_body_gear_targets(pos.z, p_mid[3].z, p_low[3].z, profs, settings.model_body_top, settings.model_body_middle, settings.model_body_bottom)
                         write_macronode(nodes_elem, f"{prefix}Node{i}", pos, settings.model_node_mass, settings.model_node_fixed, p_n, c_names)
@@ -506,16 +530,20 @@ class ExportModelToXML(bpy.types.Operator):
                 for v in verts:
                     pos = o.matrix_world @ v.co
                     is_cloth, is_piv = v.index in cloth_idx, v.index in pivot_idx
+                    is_macro = v.index in macro_idx and custom_p_nodes and custom_child_names
                     name = "NPivot" if is_piv else f"{prefix}Node{start_node + v.index}"
                     name_map[v.index] = name
                     
-                    attribs = {"Type": "Node", "X": str(pos.x), "Y": str(pos.z), "Z": str(-pos.y),
-                               "Mass": str(settings.model_export_cloth_mass if is_cloth else settings.model_node_mass),
-                               "Fixed": "0" if is_cloth else ("1" if settings.model_node_fixed else "0"),
-                               "PinFixed": "0", "Visible": "1", "Passive": "0", "Cloth": "1" if is_cloth else "0",
-                               "Collisible": "0" if is_cloth else ("1" if settings.model_node_collisible else "0")}
-                    if is_cloth: attribs.update({"Attenuation": f"{settings.model_export_cloth_attenuation:.2f}", "Rank": "0"})
-                    ET.SubElement(nodes_elem, name, **attribs)
+                    if is_macro and not is_cloth:
+                        write_macronode(nodes_elem, name, pos, settings.model_node_mass, settings.model_node_fixed, custom_p_nodes, custom_child_names)
+                    else:
+                        attribs = {"Type": "Node", "X": str(pos.x), "Y": str(pos.z), "Z": str(-pos.y),
+                                   "Mass": str(settings.model_export_cloth_mass if is_cloth else settings.model_node_mass),
+                                   "Fixed": "0" if is_cloth else ("1" if settings.model_node_fixed else "0"),
+                                   "PinFixed": "0", "Visible": "1", "Passive": "0", "Cloth": "1" if is_cloth else "0",
+                                   "Collisible": "0" if is_cloth else ("1" if settings.model_node_collisible else "0")}
+                        if is_cloth: attribs.update({"Attenuation": f"{settings.model_export_cloth_attenuation:.2f}", "Rank": "0"})
+                        ET.SubElement(nodes_elem, name, **attribs)
                 store_edge(context, edges, verts, expected_type, edges_elem, start_edge, start_node, name_map)
                 store_face(context, faces, verts, expected_type, figs_elem, start_tri, start_node, name_map)
             else:
@@ -523,7 +551,7 @@ class ExportModelToXML(bpy.types.Operator):
                 start_edge += len(edges)
                 store_face(context, faces, verts, expected_type, figs_elem, start_tri, start_node)
                 start_tri += len(faces)
-                start_node = process_object_nodes(o, verts, nodes_elem, start_node, prefix, settings, cloth_idx, p_nodes, child_reqs)
+                start_node = process_object_nodes(o, verts, nodes_elem, start_node, prefix, settings, cloth_idx, p_nodes, child_reqs, macro_idx, custom_p_nodes, custom_child_names)
             return True
 
         if m_type == "MODEL": process_mesh_export(obj, "MODEL", [], settings.model_export_cloth_general_folder)
@@ -1916,7 +1944,19 @@ class VIEW3D_PT_gymnast_model_settings_export(bpy.types.Panel):
                 box2.prop(props, "model_export_cloth_foot2_folder")
         
         box3 = layout.box()
-        box3.label(text="Childnode (WIP)")
+        box3.label(text="Childnode")
+
+        box3.prop(props, "model_custom_childnode")
+        if props.model_custom_childnode:
+            if model_type != 'WEAPON':
+                box3.prop(props, "macronode_vertex_group")
+            elif model_type == 'WEAPON':
+                box3.prop(props, "macronode_vertex_group_weapon_1")
+                box3.prop(props, "macronode_vertex_group_weapon_2")
+            box3.prop(props, "childnode_1_object")
+            box3.prop(props, "childnode_2_object")
+            box3.prop(props, "childnode_3_object")
+            box3.prop(props, "childnode_4_object")
 
 class VIEW3D_PT_gymnast_settings_object_settings(bpy.types.Panel):
     bl_label = "Object Alignment"
