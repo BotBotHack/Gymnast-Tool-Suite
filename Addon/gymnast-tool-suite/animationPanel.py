@@ -420,6 +420,12 @@ class ImportBinOperator(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
     
     filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    
+    filter_glob: bpy.props.StringProperty(
+        default="*.bin;*.bytes",
+        options={'HIDDEN'},
+        maxlen=255,
+    )
 
     def execute(self, context):
         settings = context.scene.gymnast_tool_props
