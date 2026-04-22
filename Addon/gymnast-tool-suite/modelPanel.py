@@ -547,8 +547,10 @@ class ExportModelToXML(bpy.types.Operator):
                 store_edge(context, edges, verts, expected_type, edges_elem, start_edge, start_node, name_map)
                 store_face(context, faces, verts, expected_type, figs_elem, start_tri, start_node, name_map)
             else:
-                store_edge(context, edges, verts, expected_type, edges_elem, start_edge, start_node)
-                start_edge += len(edges)
+                if expected_type != "WEAPON" or settings.model_edge_include:
+                    store_edge(context, edges, verts, expected_type, edges_elem, start_edge, start_node)
+                    start_edge += len(edges)
+                    
                 store_face(context, faces, verts, expected_type, figs_elem, start_tri, start_node)
                 start_tri += len(faces)
                 start_node = process_object_nodes(o, verts, nodes_elem, start_node, prefix, settings, cloth_idx, p_nodes, child_reqs, macro_idx, custom_p_nodes, custom_child_names)
@@ -1515,6 +1517,11 @@ class GymnastToolModelSettings(bpy.types.PropertyGroup):
         description="Every edge is collisible\nDefault: False", 
         default=False
     )
+    model_edge_include: bpy.props.BoolProperty(
+        name="Include Edges",
+        description="Whether or not to include edges in the exported XML, Attack Edges are still exported.\nDefault: True",
+        default=True
+    )
     model_node_offset: bpy.props.IntProperty(
         name="Start Node",
         description="Starting number for node numbering\nDefault: 1",
@@ -1533,6 +1540,7 @@ class GymnastToolModelSettings(bpy.types.PropertyGroup):
         default=1,
         min=1
     )
+
 
     # CLOTH SETTINGS
     model_export_cloth: bpy.props.BoolProperty(
@@ -1899,6 +1907,7 @@ class VIEW3D_PT_gymnast_model_settings_export(bpy.types.Panel):
             box.prop(props, "model_node_mass")
             box.prop(props, "model_node_fixed")
             box.prop(props, "model_edge_collisible")
+            box.prop(props, "model_edge_include")
         elif model_type == 'FOOT_GEAR':
             box.prop(props, "foot_object_1")
             box.prop(props, "foot_object_2")
