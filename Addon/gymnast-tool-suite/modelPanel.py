@@ -1341,16 +1341,12 @@ class SetOrientation(bpy.types.Operator):
 
         # alignments
         for obj, orig, tz, ty, tx, track_x in configs:
-            if st.model_use_origin or not st.model_use_existing_object:
-                translate_origin_to_target(obj, orig.location)
-                if st.model_use_existing_object:
-                    align_object_to_basis(obj, orig.location, tz, ty)
+            translate_origin_to_target(obj, orig.location)
             
             if st.model_apply_constraint or m_type in {'WEAPON', 'FOOT_GEAR', 'HEAD_GEAR', 'RANGED'}:
-                if not st.model_use_existing_object:
-                    obj.matrix_world.translation = Vector((0,0,0))
-                    align_object_to_basis(obj, orig.location, tz, ty)
-                setup_tracking_constraints(obj, orig, tz, ty, tx, track_x, use_offset=not st.model_use_existing_object)
+                obj.matrix_world.translation = Vector((0,0,0))
+                align_object_to_basis(obj, orig.location, tz, ty)
+                setup_tracking_constraints(obj, orig, tz, ty, tx, track_x, use_offset=True)
 
         self.report({'INFO'}, "Orientation applied successfully.")
         return {'FINISHED'}
@@ -1677,11 +1673,6 @@ class GymnastToolModelSettings(bpy.types.PropertyGroup):
         description="Allows for a manual set-up with complicated models.", 
         default=False
     )
-    model_use_existing_object: bpy.props.BoolProperty(
-        name="Use Existing OBJ", 
-        description="When importing Nekki's Model, the LCCs will already be applied to the MacroNode. This make it so that when:\n Enabled - Set Origin Alignment and Constraint to the Model will not change its position visually.\n Disabled - Set Model's alignment and constraint will change its position and orientation (Used for Model that's not attached originally).\nDefault: True", 
-        default=True
-    )
     calculate_macronode: bpy.props.BoolProperty(
         name="Apply LCCs", 
         description="Whether or not to apply LCC to MacroNode while importing.\nDefault: True", 
@@ -1999,18 +1990,15 @@ class VIEW3D_PT_gymnast_settings_object_settings(bpy.types.Panel):
             box.label(text="Weapon Alignment")
             box.prop(props, "weapon_object_1")
             box.prop(props, "weapon_object_2")
-            box.prop(props, "model_use_existing_object")
             
         elif model_type == 'FOOT_GEAR':
             box.label(text="Footwear Alignment")
             box.prop(props, "foot_object_1")
             box.prop(props, "foot_object_2")
-            box.prop(props, "model_use_existing_object")
             
         elif model_type == 'HEAD_GEAR':
             box.label(text="Head Gear Alignment")
             box.prop(props, "selected_object")
-            box.prop(props, "model_use_existing_object")
             box.prop(props, "model_align_flipped")
             
         elif model_type == 'BODY_GEAR':
@@ -2018,13 +2006,11 @@ class VIEW3D_PT_gymnast_settings_object_settings(bpy.types.Panel):
             box.prop(props, "selected_object")
             box.prop(props, "model_body_top")
             box.prop(props, "model_body_middle")
-            box.prop(props, "model_body_bottom")
-            box.prop(props, "model_align_flipped")                
+            box.prop(props, "model_body_bottom")              
             
         elif model_type == 'RANGED':
             box.label(text="Ranged Alignment")
             box.prop(props, "selected_object")
-            box.prop(props, "model_use_existing_object")
             
         box.operator("model.set_orientation", text="Set Alignment")
             
