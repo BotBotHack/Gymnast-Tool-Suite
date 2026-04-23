@@ -180,7 +180,7 @@ def write_clothnode(element, name, pos, mass, attenuation):
 def process_object_nodes(obj, vertices, nodes_element, start_node, prefix, settings, cloth_indices, p_nodes, child_names, macro_indices=None, custom_p_nodes=None, custom_child_names=None):
     if macro_indices is None: macro_indices = set()
     for i, vertex in enumerate(vertices, start=start_node):
-        node_name = f"{prefix}Node{i}"
+        node_name = f"{prefix}Node-{i}"
         pos = obj.matrix_world @ vertex.co
         if vertex.index in cloth_indices:
             write_clothnode(nodes_element, node_name, pos, settings.model_export_cloth_mass, settings.model_export_cloth_attenuation)
@@ -198,16 +198,16 @@ def store_edge(context, edges, vertices, model_type, edges_element, starting_edg
         node1, node2 = None, None
         
         if model_type in {"HEAD_GEAR", "WEAPON", "BODY_GEAR", "FOOT_GEAR", "RANGED"}:
-            node1 = f"{prefix}Node{v1 + starting_node}"
-            node2 = f"{prefix}Node{v2 + starting_node}"
+            node1 = f"{prefix}Node-{v1 + starting_node}"
+            node2 = f"{prefix}Node-{v2 + starting_node}"
         elif model_type == "MODEL":
-            node1 = node_name_map.get(v1) if settings.model_use_pivot else f"{prefix}Node{v1 + starting_node}"
-            node2 = node_name_map.get(v2) if settings.model_use_pivot else f"{prefix}Node{v2 + starting_node}"
+            node1 = node_name_map.get(v1) if settings.model_use_pivot else f"{prefix}Node-{v1 + starting_node}"
+            node2 = node_name_map.get(v2) if settings.model_use_pivot else f"{prefix}Node-{v2 + starting_node}"
             
         if not node1 or not node2: continue
         
         length = math.dist(vertices[v1].co, vertices[v2].co)
-        ET.SubElement(edges_element, f"{prefix}Edge{i}", Type="Edge", Length=str(length), WithSign="0", Fixed="0", Visible="1",
+        ET.SubElement(edges_element, f"{prefix}Edge-{i}", Type="Edge", Length=str(length), WithSign="0", Fixed="0", Visible="1",
                       Collisible="1" if settings.model_edge_collisible else "0", SubNodesCount="0", End1=node1, End2=node2)
 
 def store_face(context, faces, vertices, model_type, figures_element, starting_tri, starting_node, node_name_map=None):
@@ -219,12 +219,12 @@ def store_face(context, faces, vertices, model_type, figures_element, starting_t
             n1, n2, n3 = None, None, None
             
             if model_type in {"HEAD_GEAR", "WEAPON", "BODY_GEAR", "FOOT_GEAR", "RANGED"}:
-                n1, n2, n3 = f"{prefix}Node{v1+starting_node}", f"{prefix}Node{v2+starting_node}", f"{prefix}Node{v3+starting_node}"
+                n1, n2, n3 = f"{prefix}Node-{v1+starting_node}", f"{prefix}Node-{v2+starting_node}", f"{prefix}Node-{v3+starting_node}"
             elif model_type == "MODEL":
                 if settings.model_use_pivot:
                     n1, n2, n3 = node_name_map.get(v1), node_name_map.get(v2), node_name_map.get(v3)
                 else:
-                    n1, n2, n3 = f"{prefix}Node{v1+starting_node}", f"{prefix}Node{v2+starting_node}", f"{prefix}Node{v3+starting_node}"
+                    n1, n2, n3 = f"{prefix}Node-{v1+starting_node}", f"{prefix}Node-{v2+starting_node}", f"{prefix}Node-{v3+starting_node}"
             
             if not n1 or not n2 or not n3: continue
             ET.SubElement(figures_element, f"{prefix}Triangle-{i}", Type="Triangle", Node1=n1, Node2=n2, Node3=n3)
@@ -234,10 +234,10 @@ def store_edge_attack(context, edges, vertices, edges_element, starting_edge, st
     prefix = settings.model_string_name
     for i, edge in enumerate(edges, start=1):
         v1, v2 = edge.vertices
-        n1, n2 = f"{prefix}Node{v1 + starting_node}", f"{prefix}Node{v2 + starting_node}"
+        n1, n2 = f"{prefix}Node-{v1 + starting_node}", f"{prefix}Node-{v2 + starting_node}"
         length = math.dist(vertices[v1].co, vertices[v2].co)
         
-        name = f"{prefix}AttackEdge{i}" if is_ranged else (f"{prefix}AttackEdge{i}_1" if is_first else f"{prefix}AttackEdge{i}_2")
+        name = f"{prefix}AttackEdge-{i}" if is_ranged else (f"{prefix}AttackEdge-{i}_1" if is_first else f"{prefix}AttackEdge-{i}_2")
         ET.SubElement(edges_element, name, Type="Edge", Length=str(length), WithSign="0", Fixed="0", Visible="1",
                       Collisible="1" if settings.model_edge_collisible else "0", SubNodesCount="0", End1=n1, End2=n2)
 
@@ -471,7 +471,6 @@ class ExportModelToXML(bpy.types.Operator):
             mesh, verts, edges, faces = get_triangulated_data(o)
             cloth_idx = get_cloth_indices(o, cloth_grp_name) if settings.model_export_cloth else set()
             
-            # Custom ChildNodes Override
             macro_idx = set()
             custom_p_nodes = ()
             custom_child_names = []
@@ -514,12 +513,12 @@ class ExportModelToXML(bpy.types.Operator):
                 for i, v in enumerate(verts, start=start_node):
                     pos = o.matrix_world @ v.co
                     if v.index in cloth_idx:
-                        write_clothnode(nodes_elem, f"{prefix}Node{i}", pos, settings.model_export_cloth_mass, settings.model_export_cloth_attenuation)
+                        write_clothnode(nodes_elem, f"{prefix}Node-{i}", pos, settings.model_export_cloth_mass, settings.model_export_cloth_attenuation)
                     elif v.index in macro_idx and custom_p_nodes and custom_child_names:
-                        write_macronode(nodes_elem, f"{prefix}Node{i}", pos, settings.model_node_mass, settings.model_node_fixed, custom_p_nodes, custom_child_names)
+                        write_macronode(nodes_elem, f"{prefix}Node-{i}", pos, settings.model_node_mass, settings.model_node_fixed, custom_p_nodes, custom_child_names)
                     else:
                         p_n, c_names = get_body_gear_targets(pos.z, p_mid[3].z, p_low[3].z, profs, settings.model_body_top, settings.model_body_middle, settings.model_body_bottom)
-                        write_macronode(nodes_elem, f"{prefix}Node{i}", pos, settings.model_node_mass, settings.model_node_fixed, p_n, c_names)
+                        write_macronode(nodes_elem, f"{prefix}Node-{i}", pos, settings.model_node_mass, settings.model_node_fixed, p_n, c_names)
                 if settings.model_include_necessary_tri_body:
                     def w_tri(n1,n2,n3, suffix): ET.SubElement(figs_elem, f"{prefix}Foot-Triangle{suffix}", Type="Triangle", Shading="0", Node1=n1, Node2=n2, Node3=n3)
                     w_tri("NHeel_1","NToe_1","NAnkle_1","1_1"); w_tri("NToeS_1","NToe_1","NHeel_1","2_1")
@@ -531,7 +530,7 @@ class ExportModelToXML(bpy.types.Operator):
                     pos = o.matrix_world @ v.co
                     is_cloth, is_piv = v.index in cloth_idx, v.index in pivot_idx
                     is_macro = v.index in macro_idx and custom_p_nodes and custom_child_names
-                    name = "NPivot" if is_piv else f"{prefix}Node{start_node + v.index}"
+                    name = "NPivot" if is_piv else f"{prefix}Node-{start_node + v.index}"
                     name_map[v.index] = name
                     
                     if is_macro and not is_cloth:
@@ -599,7 +598,14 @@ class ExportModelToXML(bpy.types.Operator):
                     ET.SubElement(figs_elem, obj_cap.name, Type="Capsule", Edge=edge_val, Radius1=f"{rad:.2f}", Radius2=f"{rad:.2f}", Margin1=str(m1), Margin2=str(m2))
 
         filepath = self.filepath if self.filepath.lower().endswith(".xml") else self.filepath + ".xml"
-        with open(filepath, "w", encoding="utf-8") as f: f.write(minidom.parseString(ET.tostring(root, encoding="unicode")).toprettyxml(indent="  "))
+        
+        with open(filepath, "w", encoding="utf-8") as f:
+            if settings.model_optimize_xml:
+                xml_string = '<?xml version="1.0" ?>\n' + ET.tostring(root, encoding="unicode")
+                f.write(xml_string)
+            else:
+                f.write(minidom.parseString(ET.tostring(root, encoding="unicode")).toprettyxml(indent="  "))
+                
         self.report({'INFO'}, f"Model exported to {filepath}")
         return {'FINISHED'}
 
@@ -1723,6 +1729,11 @@ class GymnastToolModelSettings(bpy.types.PropertyGroup):
         description="Add a Cloth Vertex Group during the conversion.\nDefault: True", 
         default=True
     )
+    model_optimize_xml: bpy.props.BoolProperty(
+        name="Optimize XML", 
+        description="Reduce the size of the XML as much as possible by removing formatting, indentation, and newlines.\nDefault: False", 
+        default=False
+    )
 
     # CHILDNODE SETTINGS (WIP)
     model_custom_childnode: bpy.props.BoolProperty(
@@ -1942,6 +1953,8 @@ class VIEW3D_PT_gymnast_model_settings_export(bpy.types.Panel):
             elif model_type == 'FOOT_GEAR':
                 box2.prop(props, "model_export_cloth_foot1_folder")
                 box2.prop(props, "model_export_cloth_foot2_folder")
+
+        box2.prop(props, "model_optimize_xml")
         
         box3 = layout.box()
         box3.label(text="Childnode")
